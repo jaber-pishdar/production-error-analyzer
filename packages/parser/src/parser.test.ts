@@ -1,82 +1,141 @@
 import { describe, it, expect } from 'vitest';
-import { parse, detectFormat } from '../src/index.js';
+import { parse } from '../src/index.js';
 
-describe('detectFormat', () => {
-  it('detects JSON format', () => {
-    const input = '{"message":"hello","level":"error"}';
-    expect(detectFormat(input)).toBe('json');
-  });
-
-  it('detects Apache format', () => {
-    const input = '127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326';
-    expect(detectFormat(input)).toBe('apache');
-  });
-
-  it('detects Node.js error format', () => {
-    const input = 'Error: Cannot find module\n    at Function.Module._resolveFilename';
-    expect(detectFormat(input)).toBe('nodejs');
-  });
-
-  it('detects PHP format', () => {
-    const input = '[15-Mar-2024 10:30:00 UTC] PHP Warning:  mysqli_connect(): Connection refused';
-    expect(detectFormat(input)).toBe('php');
-  });
-
-  it('detects Python format', () => {
-    const input = 'ERROR:myapp:Database connection failed';
-    expect(detectFormat(input)).toBe('python');
-  });
-
-  it('returns unknown for empty input', () => {
-    expect(detectFormat('')).toBe('unknown');
-  });
-});
-
-describe('parse JSON', () => {
-  it('parses a single JSON log line', () => {
-    const input = '{"timestamp":"2024-03-15T10:30:00Z","level":"error","message":"Something broke"}';
-    const result = parse(input, 'json');
+describe('Node.js log parser', () => {
+  // 1. Valid log — single line
+  it('parses a valid single-line error', () => {
+    const input = '2026-08-22T10:15:31Z ERROR Database connection failed';
+    const result = parse(input);
     expect(result.entries).toHaveLength(1);
-    expect(result.entries[0].message).toBe('Something broke');
+    expect(result.entries[0].timestamp).toEqual(new Date('2026-08-22T10:15:31Z'));
     expect(result.entries[0].level).toBe('error');
+    expect(result.entries[0].message).toBe('Database connection failed');
+    expect(result.entries[0].source).toBe('node');
+    expect(result.errors).toHaveLength(0);
   });
 
-  it('parses multiple JSON lines', () => {
-    const input = [
-      '{"timestamp":"2024-03-15T10:30:00Z","level":"error","message":"First error"}',
-      '{"timestamp":"2024-03-15T10:31:00Z","level":"warn","message":"A warning"}',
-    ].join('\n');
-    const result = parse(input, 'json');
-    expect(result.entries).toHaveLength(2);
+  // 2. Invalid log — bad format
+  it('rejects a line without a valid timestamp+level header', () => {
+    const input = 'this is just some random text';
+    const result = parse(input);
+    expect(result.entries).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].line).toBe(1);
   });
 
-  it('reports parse errors for invalid JSON', () => {
-    const input = '{"valid": true}\nnot json\n{"also valid": 1}';
-    const result = parse(input, 'json');
-    expect(result.entries).toHaveLength(2);
+  // 3. Missing timestamp
+  it('rejects a line with level but no timestamp prefix', () => {
+    const input = 'ERROR something broke';
+    const result = parse(input);
+    expect(result.entries).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
   });
 
-  it('handles empty input', () => {
-    const result = parse('', 'json');
+  // 4. Missing level
+  it('rejects a line with timestamp but no level keyword', () => {
+    const input = '2026-08-22T10:15:31Z just a message without level';
+    const result = parse(input);
     expect(result.entries).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+  });
+
+  // 5. Multi-line stack trace
+  it('parses a multi-line error with stack trace', () => {
+    const input = [
+      '2026-08-22T10:15:31Z ERROR Connection timeout',
+      '    at Socket.connect (net.js:123:15)',
+      '    at RedisClient._onConnect (redis.js:456:10)',
+      '    at processTicksAndRejections (internal/process/task_queues.js:95:5)',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].message).toBe('Connection timeout');
+    expect(result.entries[0].stackTrace).toContain('net.js:123:15');
+    expect(result.entries[0].stackTrace).toContain('redis.js:456:10');
     expect(result.errors).toHaveLength(0);
   });
-});
 
-describe('parse Apache', () => {
-  it('parses Apache access log', () => {
-    const input = '127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /index.html HTTP/1.0" 200 2326';
-    const result = parse(input, 'apache');
-    expect(result.entries).toHaveLength(1);
-    expect(result.entries[0].endpoint).toBe('/index.html');
-    expect(result.entries[0].httpStatus).toBe(200);
-    expect(result.entries[0].httpMethod).toBe('GET');
+  // 6. Duplicate errors
+  it('parses two identical error lines as two separate entries', () => {
+    const input = [
+      '2026-08-22T10:15:31Z ERROR Database connection failed',
+      '2026-08-22T10:16:01Z ERROR Database connection failed',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0].message).toBe(result.entries[1].message);
+    expect(result.entries[0].id).not.toBe(result.entries[1].id);
+    expect(result.errors).toHaveLength(0);
   });
 
-  it('marks 5xx as error level', () => {
-    const input = '127.0.0.1 - - [10/Oct/2000:13:55:36 -0700] "GET /api/users HTTP/1.0" 503 123';
-    const result = parse(input, 'apache');
-    expect(result.entries[0].level).toBe('error');
+  // 7. Different errors
+  it('parses two distinct error types', () => {
+    const input = [
+      '2026-08-22T10:15:31Z ERROR Database connection failed',
+      '2026-08-22T10:16:01Z ERROR Out of memory',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0].message).toBe('Database connection failed');
+    expect(result.entries[1].message).toBe('Out of memory');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  // Extra: mixed valid/invalid
+  // Lines without a TIMESTAMP LEVEL header are treated as continuation
+  // of the previous entry's message, not as errors
+  it('treats continuation lines as part of the previous entry', () => {
+    const input = [
+      '2026-08-22T10:15:31Z ERROR First error',
+      'some additional detail',
+      '2026-08-22T10:16:01Z ERROR Second error',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0].message).toContain('some additional detail');
+    expect(result.errors).toHaveLength(0);
+  });
+
+  // Extra: blank lines are ignored
+  it('skips blank lines', () => {
+    const input = [
+      '',
+      '2026-08-22T10:15:31Z ERROR Something broke',
+      '',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(1);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  // Extra: timezone offset
+  it('parses timestamp with timezone offset', () => {
+    const input = '2026-08-22T14:45:00+03:30 ERROR With offset';
+    const result = parse(input);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].message).toBe('With offset');
+    // Date parsing should handle ISO-8601 with offset
+    expect(result.entries[0].timestamp).toBeDefined();
+  });
+
+  // Extra: WARN level alias
+  it('parses WARNING as warn level', () => {
+    const input = '2026-08-22T10:15:31Z WARNING Disk space low';
+    const result = parse(input);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].level).toBe('warn');
+  });
+
+  // Extra: multiline message without stack trace
+  it('handles multi-line message without stack trace', () => {
+    const input = [
+      '2026-08-22T10:15:31Z ERROR',
+      'Request failed with status 500',
+      'Response body: {"error":"internal"}',
+    ].join('\n');
+    const result = parse(input);
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].message).toBe('Request failed with status 500\nResponse body: {"error":"internal"}');
+    expect(result.entries[0].stackTrace).toBeUndefined();
   });
 });

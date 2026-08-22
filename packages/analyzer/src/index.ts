@@ -1,25 +1,29 @@
-import type { NormalizedLogEntry, ErrorGroup, DashboardMetrics, TimeBucket } from '@pea/shared';
+import type { NormalizedLogEntry, ErrorGroup, LogLevel } from '@pea/shared';
 import crypto from 'node:crypto';
 
 /**
  * Generate a fingerprint for an error based on message and stack trace.
- * This groups identical errors together.
+ * Normalises dynamic values (numbers, IDs, quotes) so identical errors
+ * with different runtime data produce the same fingerprint.
  */
 export function fingerprint(entry: NormalizedLogEntry): string {
-  const normalizedMessage = entry.message
+  const normalised = entry.message
     .replace(/\d+/g, '0')
     .replace(/"[^"]*"/g, '"..."')
-    .replace(/'[^']*'/g, "'...'")
+       .replace(/'[^']*'/g, "'...'")
     .replace(/`[^`]*`/g, '`...`')
-    .slice(0, 200);
+    .trim();
+
   const stackHash = entry.stackTrace
-    ? entry.stackTrace.replace(/\d+/g, '0').slice(0, 100)
+    ? crypto.createHash('md5').update(entry.stackTrace.replace(/\d+/g, '0')).digest('hex').slice(0, 12)
     : '';
-  return crypto.createHash('md5').update(normalizedMessage + stackHash).digest('hex');
+
+  return crypto.createHash('md5').update(`${normalised}|${stackHash}`).digest('hex');
 }
 
 /**
  * Group a list of entries into error groups by fingerprint.
+ * Info/debug entries are ignored — only warn+ matter.
  */
 export function groupErrors(entries: NormalizedLogEntry[]): ErrorGroup[] {
   const groups = new Map<string, ErrorGroup>();
@@ -32,65 +36,23 @@ export function groupErrors(entries: NormalizedLogEntry[]): ErrorGroup[] {
 
     if (existing) {
       existing.count++;
-      existing.lastSeen = new Date(Math.max(existing.lastSeen.getTime(), entry.timestamp.getTime()));
-      if (entry.endpoint && !existing.endpoints.includes(entry.endpoint)) {
-        existing.endpoints.push(entry.endpoint);
-      }
-      existing.entries.push(entry);
+      existing.lastSeen =
+        entry.timestamp > existing.lastSeen ? entry.timestamp : existing.lastSeen;
+      existing.firstSeen =
+        entry.timestamp < existing.firstSeen ? entry.timestamp : existing.firstSeen;
     } else {
       groups.set(fp, {
         fingerprint: fp,
         message: entry.message,
-        errorType: entry.errorType,
         level: entry.level,
+        source: entry.source,
         count: 1,
         firstSeen: entry.timestamp,
         lastSeen: entry.timestamp,
-        endpoints: entry.endpoint ? [entry.endpoint] : [],
         stackTrace: entry.stackTrace,
-        entries: [entry],
       });
     }
   }
 
   return Array.from(groups.values()).sort((a, b) => b.count - a.count);
-}
-
-/**
- * Compute dashboard metrics from a list of error groups.
- */
-export function computeMetrics(groups: ErrorGroup[], entries: NormalizedLogEntry[]): DashboardMetrics {
-  const totalErrors = entries.filter((e) => e.level === 'error' || e.level === 'critical' || e.level === 'warn').length;
-  const uniqueErrors = groups.length;
-  const criticalErrors = groups.filter((g) => g.level === 'critical').length;
-
-  // Top 10 most frequent
-  const mostFrequent = groups.slice(0, 10);
-
-  // Errors by endpoint
-  const errorsByEndpoint: Record<string, number> = {};
-  for (const entry of entries) {
-    if (entry.endpoint) {
-      errorsByEndpoint[entry.endpoint] = (errorsByEndpoint[entry.endpoint] ?? 0) + 1;
-    }
-  }
-
-  // Errors by time (hourly buckets)
-  const buckets = new Map<string, number>();
-  for (const entry of entries) {
-    const key = entry.timestamp.toISOString().slice(0, 13); // hour precision
-    buckets.set(key, (buckets.get(key) ?? 0) + 1);
-  }
-  const errorsByTime: TimeBucket[] = Array.from(buckets.entries())
-    .map(([time, count]) => ({ time: new Date(time), count }))
-    .sort((a, b) => a.time.getTime() - b.time.getTime());
-
-  return {
-    totalErrors,
-    uniqueErrors,
-    criticalErrors,
-    mostFrequent,
-    errorsByEndpoint,
-    errorsByTime,
-  };
 }

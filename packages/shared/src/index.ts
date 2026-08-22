@@ -4,44 +4,23 @@ export interface NormalizedLogEntry {
   timestamp: Date;
   level: LogLevel;
   message: string;
-  service?: string;
-  endpoint?: string;
-  httpMethod?: string;
-  httpStatus?: number;
+  source: LogSource;
   stackTrace?: string;
-  errorType?: string;
   raw: string;
-  sourceFormat: LogFormat;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'critical';
-export type LogFormat = 'json' | 'apache' | 'nginx' | 'nodejs' | 'php' | 'python' | 'unknown';
+export type LogSource = 'node' | 'unknown';
 
 export interface ErrorGroup {
   fingerprint: string;
   message: string;
-  errorType?: string;
   level: LogLevel;
+  source: LogSource;
   count: number;
   firstSeen: Date;
   lastSeen: Date;
-  endpoints: string[];
   stackTrace?: string;
-  entries: NormalizedLogEntry[];
-}
-
-export interface DashboardMetrics {
-  totalErrors: number;
-  uniqueErrors: number;
-  criticalErrors: number;
-  mostFrequent: ErrorGroup[];
-  errorsByEndpoint: Record<string, number>;
-  errorsByTime: TimeBucket[];
-}
-
-export interface TimeBucket {
-  time: Date;
-  count: number;
 }
 
 export interface ParserResult {
