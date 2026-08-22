@@ -55,3 +55,23 @@ export interface ParseError {
   message: string;
   raw: string;
 }
+
+export interface TimeBucket {
+  time: string;  // ISO-8601 truncated to interval granularity, e.g. "2026-08-22T10:00:00Z"
+  count: number;
+}
+
+export interface TimeSeries {
+  buckets: TimeBucket[];
+  interval: string;  // "1h", "5m", "1d"
+  spikeBuckets: TimeBucket[];
+}
+
+export interface RegressionResult {
+  detected: boolean;
+  beforeRate: number;   // errors/hour before
+  afterRate: number;    // errors/hour after
+  ratio: number;        // afterRate / beforeRate
+  releaseTime: string;  // ISO-8601
+  message: string;
+}

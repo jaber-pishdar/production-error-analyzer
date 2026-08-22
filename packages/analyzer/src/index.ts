@@ -4,6 +4,7 @@ import { classifyEntrySeverity, classifyGroupSeverity } from './classifier.js';
 
 export { classifyEntrySeverity, classifyGroupSeverity };
 export { computeHttpMetrics } from './http-metrics.js';
+export { aggregateByTime, detectRegression } from './time-analysis.js';
 
 // Matches a stack frame line like:
 //   at FunctionName (file.js:10:20)

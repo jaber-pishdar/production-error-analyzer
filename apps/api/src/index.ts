@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { parse } from '@pea/parser';
-import { groupErrors, computeHttpMetrics } from '@pea/analyzer';
+import { groupErrors, computeHttpMetrics, aggregateByTime, detectRegression } from '@pea/analyzer';
 import type { NormalizedLogEntry } from '@pea/shared';
 
 const app = express();
@@ -41,6 +41,21 @@ app.post('/api/parse', (req, res) => {
 // GET /api/http-metrics — compute HTTP metrics from current entries
 app.get('/api/http-metrics', (_req, res) => {
   res.json(computeHttpMetrics(currentEntries));
+});
+
+// GET /api/time-series — aggregate errors by time interval
+app.get('/api/time-series', (req, res) => {
+  const interval = (req.query.interval as string) || '1h';
+  res.json(aggregateByTime(currentEntries, interval as any));
+});
+
+// GET /api/regression — detect regression after a release time
+app.get('/api/regression', (req, res) => {
+  const releaseTime = req.query.release as string;
+  if (!releaseTime) {
+    return res.status(400).json({ error: 'Missing "release" query parameter (ISO-8601 timestamp)' });
+  }
+  res.json(detectRegression(currentEntries, releaseTime));
 });
 
 // GET /api/entries — get raw parsed entries
