@@ -75,3 +75,17 @@ export interface RegressionResult {
   releaseTime: string;  // ISO-8601
   message: string;
 }
+
+export interface DashboardOverview {
+  totalErrors: number;
+  errorRate: number;
+  criticalErrors: number;
+  affectedEndpoints: number;
+}
+
+export interface DashboardData {
+  overview: DashboardOverview;
+  groups: ErrorGroup[];
+  httpMetrics: HttpMetrics;
+  timeSeries: TimeSeries;
+}

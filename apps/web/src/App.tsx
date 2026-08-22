@@ -1,61 +1,85 @@
-import React, { useState } from 'react';
-import type { DashboardMetrics } from '@pea/shared';
-import Dashboard from './components/Dashboard';
+import React, { useState, useCallback } from 'react';
+import type { DashboardData, ErrorGroup } from '@pea/shared';
+import Header from './components/Header';
 import LogInput from './components/LogInput';
+import OverviewCards from './components/OverviewCards';
+import ErrorGroupList from './components/ErrorGroupList';
+import TimelineChart from './components/TimelineChart';
+import EndpointTable from './components/EndpointTable';
+import ErrorDetail from './components/ErrorDetail';
+import { postParse } from './api';
+import './styles.css';
 
-function App() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+export default function App() {
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<ErrorGroup | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleParse = async (logs: string, format?: string) => {
+  const handleParse = useCallback(async (logs: string) => {
     setLoading(true);
+    setError(null);
+    setSelectedGroup(null);
     try {
-      const url = format
-        ? `/api/parse?format=${encodeURIComponent(format)}`
-        : '/api/parse';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: logs,
-      });
-      const data = await res.json();
-      if (data.metrics) setMetrics(data.metrics);
+      const data = await postParse(logs);
+      setDashboard(data.dashboard);
     } catch (err) {
-      console.error('Parse failed', err);
+      setError(String(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setDashboard(null);
+    setSelectedGroup(null);
+    setError(null);
+  }, []);
+
+  const handleSelectGroup = useCallback((group: ErrorGroup) => {
+    setSelectedGroup(group);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0' }}>
-      <header style={{ padding: '24px', borderBottom: '1px solid #1e293b' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>
-          Production Error Analyzer
-        </h1>
-        <p style={{ color: '#94a3b8', margin: '4px 0 0' }}>
-          Paste your logs, get instant error intelligence
-        </p>
-      </header>
-      <main style={{ maxWidth: 1280, margin: '0 auto', padding: '24px' }}>
-        <LogInput onParse={handleParse} loading={loading} />
-        {metrics && <Dashboard metrics={metrics} />}
-        {!metrics && !loading && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '64px 24px',
-              color: '#64748b',
-            }}
-          >
-            <p style={{ fontSize: '1.125rem' }}>
-              Paste your production logs above to see error analysis
-            </p>
-          </div>
+    <div className="app">
+      <Header onReset={handleReset} />
+
+      <main className="main">
+        {!dashboard && (
+          <>
+            <LogInput onParse={handleParse} loading={loading} />
+            {error && <div className="error-banner">{error}</div>}
+            {!loading && !error && (
+              <div className="welcome">
+                <p>Paste your production logs above to get instant error intelligence.</p>
+                <p className="hint">Supports Node.js log format with timestamps, levels, and stack traces.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {loading && <div className="loading">Parsing and analyzing…</div>}
+
+        {dashboard && !loading && (
+          <>
+            {selectedGroup ? (
+              <ErrorDetail group={selectedGroup} onBack={() => setSelectedGroup(null)} />
+            ) : (
+              <>
+                <OverviewCards {...dashboard.overview} />
+                <TimelineChart series={dashboard.timeSeries} />
+                <ErrorGroupList
+                  groups={dashboard.groups}
+                  onSelect={handleSelectGroup}
+                  selectedFingerprint={undefined}
+                />
+                <EndpointTable metrics={dashboard.httpMetrics} />
+              </>
+            )}
+          </>
         )}
       </main>
     </div>
   );
 }
-
-export default App;

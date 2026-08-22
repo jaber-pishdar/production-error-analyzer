@@ -1,101 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-interface LogInputProps {
-  onParse: (logs: string, format?: string) => void;
+interface Props {
+  onParse: (logs: string) => void;
   loading: boolean;
 }
 
-const FORMATS = [
-  { value: '', label: 'Auto-detect' },
-  { value: 'json', label: 'JSON' },
-  { value: 'apache', label: 'Apache / Nginx' },
-  { value: 'nodejs', label: 'Node.js' },
-  { value: 'php', label: 'PHP' },
-  { value: 'python', label: 'Python' },
-];
-
-export default function LogInput({ onParse, loading }: LogInputProps) {
+export default function LogInput({ onParse, loading }: Props) {
   const [logs, setLogs] = useState('');
-  const [format, setFormat] = useState('');
+  const textRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!logs.trim()) return;
-    onParse(logs, format || undefined);
+    onParse(logs);
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        background: '#1e293b',
-        borderRadius: 12,
-        padding: 24,
-        marginBottom: 24,
-      }}
-    >
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-        <label
-          htmlFor="format-select"
-          style={{ color: '#94a3b8', fontSize: '0.875rem' }}
+    <form className="log-input-form" onSubmit={handleSubmit}>
+      <div className="log-input-header">
+        <span>Paste your production logs below</span>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={loading || !logs.trim()}
         >
-          Log format:
-        </label>
-        <select
-          id="format-select"
-          value={format}
-          onChange={(e) => setFormat(e.target.value)}
-          style={{
-            background: '#0f172a',
-            color: '#e2e8f0',
-            border: '1px solid #334155',
-            borderRadius: 6,
-            padding: '6px 12px',
-            fontSize: '0.875rem',
-          }}
-        >
-          {FORMATS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          {loading ? 'Analyzing…' : 'Analyze'}
+        </button>
       </div>
       <textarea
+        ref={textRef}
+        className="log-textarea"
+        placeholder={`Paste logs here...\n\nExample:\n2026-08-22T10:15:31Z ERROR Database connection failed\n    at Socket.connect (net.js:123:15)`}
         value={logs}
         onChange={(e) => setLogs(e.target.value)}
-        placeholder="Paste your production logs here..."
-        rows={12}
-        style={{
-          width: '100%',
-          background: '#0f172a',
-          color: '#e2e8f0',
-          border: '1px solid #334155',
-          borderRadius: 8,
-          padding: 16,
-          fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-          fontSize: '0.875rem',
-          resize: 'vertical',
-          boxSizing: 'border-box',
-        }}
+        rows={8}
+        spellCheck={false}
       />
-      <button
-        type="submit"
-        disabled={loading || !logs.trim()}
-        style={{
-          marginTop: 12,
-          padding: '10px 24px',
-          background: loading ? '#334155' : '#3b82f6',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 8,
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          cursor: loading ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {loading ? 'Analyzing...' : 'Analyze Errors'}
-      </button>
     </form>
   );
 }
