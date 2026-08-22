@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import { parse } from '@pea/parser';
 import {
@@ -12,6 +14,11 @@ import type { NormalizedLogEntry, DashboardData } from '@pea/shared';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
+
+// Serve built frontend in production
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const frontendDist = path.resolve(__dirname, '../../web/dist');
+app.use(express.static(frontendDist));
 
 app.use(cors());
 app.use(express.text({ limit: '10mb', type: 'text/plain' }));
@@ -85,4 +92,9 @@ app.get('/api/entries', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
+});
+
+// SPA fallback — serve index.html for any non-API route
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(frontendDist, 'index.html'));
 });
