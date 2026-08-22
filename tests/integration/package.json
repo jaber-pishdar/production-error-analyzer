@@ -1,0 +1,17 @@
+{
+  "name": "@pea/integration-tests",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pea/parser": "workspace:*",
+    "@pea/analyzer": "workspace:*",
+    "@pea/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^1.6.0"
+  }
+}

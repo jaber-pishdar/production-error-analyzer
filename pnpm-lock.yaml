@@ -20,6 +20,9 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.43)(supports-color@8.1.1)
 
   apps/api:
     dependencies:
@@ -135,6 +138,22 @@ importers:
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
+
+  tests/integration:
+    dependencies:
+      '@pea/analyzer':
+        specifier: workspace:*
+        version: link:../../packages/analyzer
+      '@pea/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
+      '@pea/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+    devDependencies:
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.43)(supports-color@8.1.1)
 
 packages:
 
