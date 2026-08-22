@@ -138,4 +138,40 @@ describe('Node.js log parser', () => {
     expect(result.entries[0].message).toBe('Request failed with status 500\nResponse body: {"error":"internal"}');
     expect(result.entries[0].stackTrace).toBeUndefined();
   });
+
+  // HTTP: GET request
+  it('parses GET /path 200 as HTTP entry', () => {
+    const input = '2026-08-22T10:15:31Z INFO GET /api/users 200';
+    const result = parse(input);
+    expect(result.entries[0].method).toBe('GET');
+    expect(result.entries[0].endpoint).toBe('/api/users');
+    expect(result.entries[0].statusCode).toBe(200);
+  });
+
+  // HTTP: POST with error
+  it('parses POST /path 500 as error HTTP entry', () => {
+    const input = '2026-08-22T10:15:31Z ERROR POST /api/orders 500';
+    const result = parse(input);
+    expect(result.entries[0].method).toBe('POST');
+    expect(result.entries[0].endpoint).toBe('/api/orders');
+    expect(result.entries[0].statusCode).toBe(500);
+  });
+
+  // HTTP: extra text after status code
+  it('parses HTTP line with trailing text', () => {
+    const input = '2026-08-22T10:15:31Z INFO GET /api/products 200 ok';
+    const result = parse(input);
+    expect(result.entries[0].method).toBe('GET');
+    expect(result.entries[0].endpoint).toBe('/api/products');
+    expect(result.entries[0].statusCode).toBe(200);
+  });
+
+  // HTTP: non-HTTP entry should not get method/endpoint
+  it('does not extract HTTP fields from a non-HTTP message', () => {
+    const input = '2026-08-22T10:15:31Z ERROR Database connection failed';
+    const result = parse(input);
+    expect(result.entries[0].method).toBeUndefined();
+    expect(result.entries[0].endpoint).toBeUndefined();
+    expect(result.entries[0].statusCode).toBeUndefined();
+  });
 });

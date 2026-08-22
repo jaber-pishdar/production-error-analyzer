@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { classifyEntrySeverity, classifyGroupSeverity } from './classifier.js';
 
 export { classifyEntrySeverity, classifyGroupSeverity };
+export { computeHttpMetrics } from './http-metrics.js';
 
 // Matches a stack frame line like:
 //   at FunctionName (file.js:10:20)

@@ -7,6 +7,13 @@ const RE_HEADER =
 
 const RE_STACK_LINE = /^\s+at\s+/;
 
+// Matches "METHOD /path statusCode" optionally followed by more text
+// Examples:
+//   GET /api/users 200
+//   POST /api/orders 500 timeout
+//   PUT /products/123 201 created
+const RE_HTTP_LINE = /^\s*(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/\S*)\s+(\d{3})\b/;
+
 export function parse(input: string): ParserResult {
   const entries: NormalizedLogEntry[] = [];
   const errors: ParserResult['errors'] = [];
@@ -49,12 +56,9 @@ export function parse(input: string): ParserResult {
     while (i < lines.length) {
       const nextLine = lines[i];
       if (nextLine.trim() === '') {
-        // blank line inside body — keep it as part of the message,
-        // but if we have already started collecting, stop at double blank
         i++;
         continue;
       }
-      // If next line is a new header, stop
       if (RE_HEADER.test(nextLine)) {
         break;
       }
@@ -66,12 +70,20 @@ export function parse(input: string): ParserResult {
       i++;
     }
 
+    const fullMessage = messageLines.join('\n').trim();
+
+    // Extract HTTP method, endpoint and status code from the first line
+    const httpMatch = (afterLevel || messageLines[0] || '').match(RE_HTTP_LINE);
+
     entries.push({
       id: `node-${++entryCounter}`,
       timestamp,
       level,
-      message: messageLines.join('\n').trim() || '',
+      message: fullMessage || '',
       source: 'node',
+      method: httpMatch?.[1],
+      endpoint: httpMatch?.[2],
+      statusCode: httpMatch ? parseInt(httpMatch[3], 10) : undefined,
       stackTrace: stackLines.length > 0 ? stackLines.join('\n') : undefined,
       raw: [line, ...messageLines, ...stackLines].join('\n'),
     });

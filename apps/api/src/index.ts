@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { parse } from '@pea/parser';
-import { groupErrors } from '@pea/analyzer';
+import { groupErrors, computeHttpMetrics } from '@pea/analyzer';
 import type { NormalizedLogEntry } from '@pea/shared';
 
 const app = express();
@@ -31,10 +31,16 @@ app.post('/api/parse', (req, res) => {
       parseErrors: result.errors,
       entries: result.entries,
       groups: groups,
+      httpMetrics: computeHttpMetrics(result.entries),
     });
   } catch (err) {
     res.status(400).json({ error: 'Failed to parse logs', details: String(err) });
   }
+});
+
+// GET /api/http-metrics — compute HTTP metrics from current entries
+app.get('/api/http-metrics', (_req, res) => {
+  res.json(computeHttpMetrics(currentEntries));
 });
 
 // GET /api/entries — get raw parsed entries

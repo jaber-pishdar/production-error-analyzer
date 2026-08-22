@@ -5,8 +5,28 @@ export interface NormalizedLogEntry {
   level: LogLevel;
   message: string;
   source: LogSource;
+  method?: string;
+  endpoint?: string;
+  statusCode?: number;
   stackTrace?: string;
   raw: string;
+}
+
+export interface HttpEndpointStats {
+  endpoint: string;
+  method: string;
+  total: number;
+  errors: number;
+  errorRate: number;
+  statusCodes: Record<number, number>;
+}
+
+export interface HttpMetrics {
+  endpoints: HttpEndpointStats[];
+  worstEndpoint: HttpEndpointStats | null;
+  totalRequests: number;
+  totalErrors: number;
+  overallErrorRate: number;
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'critical';
