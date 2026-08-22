@@ -11,6 +11,7 @@ export interface NormalizedLogEntry {
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'critical';
 export type LogSource = 'node' | 'unknown';
+export type Severity = 'info' | 'low' | 'warning' | 'high' | 'critical';
 
 export interface ErrorGroup {
   fingerprint: string;
@@ -21,6 +22,7 @@ export interface ErrorGroup {
   firstSeen: Date;
   lastSeen: Date;
   stackTrace?: string;
+  severity: Severity;
 }
 
 export interface ParserResult {

@@ -1,5 +1,8 @@
 import type { NormalizedLogEntry, ErrorGroup } from '@pea/shared';
 import crypto from 'node:crypto';
+import { classifyEntrySeverity, classifyGroupSeverity } from './classifier.js';
+
+export { classifyEntrySeverity, classifyGroupSeverity };
 
 // Matches a stack frame line like:
 //   at FunctionName (file.js:10:20)
@@ -156,6 +159,7 @@ export function groupErrors(entries: NormalizedLogEntry[]): ErrorGroup[] {
       existing.firstSeen =
         entry.timestamp < existing.firstSeen ? entry.timestamp : existing.firstSeen;
     } else {
+      const entrySeverity = classifyEntrySeverity(entry);
       groups.set(fp, {
         fingerprint: fp,
         message: entry.message,
@@ -165,8 +169,14 @@ export function groupErrors(entries: NormalizedLogEntry[]): ErrorGroup[] {
         firstSeen: entry.timestamp,
         lastSeen: entry.timestamp,
         stackTrace: entry.stackTrace,
+        severity: entrySeverity,
       });
     }
+  }
+
+  // Compute group-level severity (may differ from entry severity based on count)
+  for (const group of groups.values()) {
+    group.severity = classifyGroupSeverity(group);
   }
 
   return Array.from(groups.values()).sort((a, b) => b.count - a.count);
