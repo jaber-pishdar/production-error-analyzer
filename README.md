@@ -31,6 +31,8 @@ An alert fires. You open the logs. Thousands of lines. No grouping. No context. 
 
 Deploy a buggy release → paste the logs → see this:
 
+![Dashboard Screenshot](docs/images/screenshot.png)
+
 ```
 ● Total Errors: 1,247
 ● Error Rate: 34.2%
