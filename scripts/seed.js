@@ -57,9 +57,9 @@ for (var m = 0; m < 60; m++) {
   if (m % 4 === 0) seed.push(log(12, m, 30, 'ERROR', 'GET /api/products 500 Internal server error'));
 }
 
-// Incident at hour 36 — minor spike
+// Incident at hour 12 (second spike, same day)
 for (var m = 0; m < 30; m++) {
-  if (m % 2 === 0) seed.push(log(36, m, 15, 'ERROR', 'TypeError: Cannot read properties of undefined'));
+  if (m % 2 === 0) seed.push(log(12, m, 15, 'ERROR', 'TypeError: Cannot read properties of undefined'));
 }
 
 console.log(seed.join('\n'));

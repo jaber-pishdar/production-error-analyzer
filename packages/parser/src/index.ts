@@ -39,7 +39,8 @@ export function parse(input: string): ParserResult {
     }
 
     const [, timestampStr, levelStr] = headerMatch;
-    const timestamp = new Date(timestampStr);
+    const parsedTimestamp = new Date(timestampStr);
+    const timestamp = isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp;
     const level = normalizeLevel(levelStr);
 
     // Everything after the level keyword on this same line is the inline message
